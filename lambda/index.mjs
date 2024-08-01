@@ -5,9 +5,31 @@ import {
   SecretsManagerClient,
   GetSecretValueCommand,
 } from "@aws-sdk/client-secrets-manager";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocumentClient, ScanCommand } from "@aws-sdk/lib-dynamodb";
 
+// read a jwt token from data-cloud-jwt dynamodb table
+const dynamodbClient = new DynamoDBClient();
+const dynamo = DynamoDBDocumentClient.from(dynamodbClient);
+const tableName = "data-cloud-jwt";
+
+try {
+  const { Items } = await dynamo.send(
+    new ScanCommand({
+      TableName: tableName,
+    })
+  );
+  const lastRecord = Items[Items.length - 1];
+  const jwtToken = lastRecord.jwt;
+
+  console.log("JWT Token", jwtToken);
+} catch (error) {
+  console.error(error);
+  throw error;
+}
+
+// get the secret from AWS Secrets Manager
 const secret_name = "data-cloud-makana";
-
 const client = new SecretsManagerClient({
   region: "us-east-2",
 });
@@ -22,6 +44,7 @@ try {
     })
   );
 } catch (error) {
+  console.error(error);
   throw error;
 }
 

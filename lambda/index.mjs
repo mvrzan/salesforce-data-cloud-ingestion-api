@@ -6,12 +6,17 @@ import {
   GetSecretValueCommand,
 } from "@aws-sdk/client-secrets-manager";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import {
+  DynamoDBDocumentClient,
+  ScanCommand,
+  PutCommand,
+} from "@aws-sdk/lib-dynamodb";
 
 // read a jwt token from data-cloud-jwt dynamodb table
 const dynamodbClient = new DynamoDBClient();
 const dynamo = DynamoDBDocumentClient.from(dynamodbClient);
 const tableName = "data-cloud-jwt";
+let tokenCached;
 
 try {
   const { Items } = await dynamo.send(
@@ -19,10 +24,16 @@ try {
       TableName: tableName,
     })
   );
-  const lastRecord = Items[Items.length - 1];
-  const jwtToken = lastRecord.jwt;
 
-  console.log("JWT Token", jwtToken);
+  if (Items.length >= 1) {
+    const lastRecord = Items[Items.length - 1];
+    const jwtToken = lastRecord.jwt;
+
+    console.log("JWT Token", jwtToken);
+  } else {
+    tokenCached = false;
+    console.log("No JWT token found in the table");
+  }
 } catch (error) {
   console.error(error);
   throw error;
@@ -52,80 +63,101 @@ const secret = JSON.parse(response.SecretString);
 
 export const handler = async (event) => {
   // fetch Salesforce token
-  console.log("Fetching Salesforce token");
+  console.log("Fetching Salesforce CRM token!");
 
   // define jwt payload
-  const payload = {
+  const tokenPayload = {
     iss: secret.CLIENT_ID,
     sub: secret.USERNAME,
     aud: secret.LOGIN_URL,
     exp: Math.round(Date.now() / 1000),
   };
 
+  // decode base64 encoded rsa key from the AWS Secret Manager
   const rsaKey = Buffer.from(secret.RSA_PRIVATE_KEY, "base64").toString(
     "ascii"
   );
 
   // create and sign jwt
-  const token = jwt.sign(payload, rsaKey, {
+  const token = jwt.sign(tokenPayload, rsaKey, {
     algorithm: "RS256",
   });
 
-  // S2S Access Token Payload
-  const data = new URLSearchParams({
-    grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-    assertion: token,
-  });
-
+  // Token Exchange Request logic
   try {
-    const response = await fetch(
+    // Salesforce CRM Access Token Payload
+    const salesforceCrmTokenPayload = new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: token,
+    });
+    const salesforceCrmResponse = await fetch(
       "https://" + secret.LOGIN_URL + "/services/oauth2/token",
       {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
-        body: data,
+        body: salesforceCrmTokenPayload,
       }
     );
 
-    if (!response.ok) {
-      throw new Error("HTTP error, status = " + response.status);
+    if (!salesforceCrmResponse.ok) {
+      throw new Error("HTTP error, status = " + salesforceCrmResponse.status);
     }
 
-    const responseData = await response.json();
+    const salesforceCrmResponseData = await salesforceCrmResponse.json();
 
-    const cdpData = new URLSearchParams({
+    // Data Cloud Token Exchange Payload
+    const dataCloudPayload = new URLSearchParams({
       grant_type: "urn:salesforce:grant-type:external:cdp",
-      subject_token: responseData.access_token,
+      subject_token: salesforceCrmResponseData.access_token,
       subject_token_type: "urn:ietf:params:oauth:token-type:access_token",
     });
 
-    // CDP Token Exchange Request
-    const cdpResponse = await fetch(
-      responseData.instance_url + "/services/a360/token",
+    // Data Cloud Token Exchange Request
+    const dataCloudResponse = await fetch(
+      salesforceCrmResponseData.instance_url + "/services/a360/token",
       {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
-        body: cdpData,
+        body: dataCloudPayload,
       }
     );
 
-    if (!cdpResponse.ok) {
-      throw new Error("HTTP error, status = " + cdpResponse.status);
+    if (!dataCloudResponse.ok) {
+      throw new Error("HTTP error, status = " + dataCloudResponse.status);
     }
 
-    const cdpResponseData = await cdpResponse.json();
-    const dataCloudInstanceUrl = cdpResponseData.instance_url;
+    const dataCloudResponseData = await dataCloudResponse.json();
+    const dataCloudInstanceUrl = dataCloudResponseData.instance_url;
+    const tokenExpiration = dataCloudResponseData.expires_in;
     const body = JSON.parse(event.body);
     const dataCloudObject = {
       data: [body],
     };
 
+    if (!tokenCached) {
+      // save jwt token to dynamodb
+      try {
+        await dynamo.send(
+          new PutCommand({
+            TableName: tableName,
+            Item: {
+              jwt: token,
+              expires_in: tokenExpiration,
+            },
+          })
+        );
+      } catch (error) {
+        console.error(error);
+        throw error;
+      }
+    }
+
     // Data Cloud Object Request
-    const dataCloudResponse = await fetch(
+    const dataCloudIngestionApiResponse = await fetch(
       "https://" +
         dataCloudInstanceUrl +
         `/api/v1/ingest/sources/${secret.INGESTION_SOURCE_API_NAME}/${event.queryStringParameters.objectName}`,
@@ -139,7 +171,10 @@ export const handler = async (event) => {
       }
     );
 
-    console.log("Data Cloud Response", await dataCloudResponse.json());
+    console.log(
+      "Data Cloud Response",
+      await dataCloudIngestionApiResponse.json()
+    );
 
     const lambdaResponse = {
       statusCode: 200,

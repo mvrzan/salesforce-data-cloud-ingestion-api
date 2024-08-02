@@ -206,17 +206,16 @@ export const handler = async (event) => {
         "The following data was just sent to Data Cloud: " +
           JSON.stringify(dataCloudObject)
       ),
-      processedData: dataCloudObject,
     };
 
     return successfulResponse;
   } catch (error) {
+    console.error("Error", error);
     const errorResponse = {
       statusCode: 500,
       body: JSON.stringify("There was an issue with the Lambda function!"),
       error: error.message,
     };
-    console.error("Error", error);
 
     return errorResponse;
   }

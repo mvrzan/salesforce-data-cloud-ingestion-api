@@ -5,18 +5,22 @@ import {
   SecretsManagerClient,
   GetSecretValueCommand,
 } from "@aws-sdk/client-secrets-manager";
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
   DynamoDBDocumentClient,
   ScanCommand,
   PutCommand,
 } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 
-// read a jwt token from data-cloud-jwt dynamodb table
+// initialize DynamoDB client
 const dynamodbClient = new DynamoDBClient();
 const dynamo = DynamoDBDocumentClient.from(dynamodbClient);
 const tableName = "data-cloud-jwt";
-let tokenCached;
+let cachedJwt;
+let cachedJwtExpiresAt;
+let dataCloudInstanceUrl;
+let fetchedDataCloudInstanceUrl;
+let dataCloudToken;
 
 try {
   const { Items } = await dynamo.send(
@@ -27,12 +31,13 @@ try {
 
   if (Items.length >= 1) {
     const lastRecord = Items[Items.length - 1];
-    const jwtToken = lastRecord.jwt;
+    cachedJwt = lastRecord.jwt;
+    cachedJwtExpiresAt = lastRecord.expires_at;
+    dataCloudInstanceUrl = lastRecord.dataCloudInstanceUrl;
 
-    console.log("JWT Token", jwtToken);
+    console.log("JWT Token", cachedJwt);
   } else {
-    tokenCached = false;
-    console.log("No JWT token found in the table");
+    console.log("No JWT token found in the DynamoDB table!");
   }
 } catch (error) {
   console.error(error);
@@ -62,29 +67,31 @@ try {
 const secret = JSON.parse(response.SecretString);
 
 export const handler = async (event) => {
-  // fetch Salesforce token
-  console.log("Fetching Salesforce CRM token!");
+  // check if the token is still valid
+  if (
+    !cachedJwtExpiresAt ||
+    cachedJwtExpiresAt - Math.round(Date.now() / 1000) < 3600
+  ) {
+    console.log("Token is expired. Fetching a new token!");
 
-  // define jwt payload
-  const tokenPayload = {
-    iss: secret.CLIENT_ID,
-    sub: secret.USERNAME,
-    aud: secret.LOGIN_URL,
-    exp: Math.round(Date.now() / 1000),
-  };
+    // define jwt payload
+    const tokenPayload = {
+      iss: secret.CLIENT_ID,
+      sub: secret.USERNAME,
+      aud: secret.LOGIN_URL,
+      exp: Math.round(Date.now() / 1000),
+    };
 
-  // decode base64 encoded rsa key from the AWS Secret Manager
-  const rsaKey = Buffer.from(secret.RSA_PRIVATE_KEY, "base64").toString(
-    "ascii"
-  );
+    // decode base64 encoded rsa key from the AWS Secret Manager
+    const rsaKey = Buffer.from(secret.RSA_PRIVATE_KEY, "base64").toString(
+      "ascii"
+    );
 
-  // create and sign jwt
-  const token = jwt.sign(tokenPayload, rsaKey, {
-    algorithm: "RS256",
-  });
+    // create and sign jwt
+    const token = jwt.sign(tokenPayload, rsaKey, {
+      algorithm: "RS256",
+    });
 
-  // Token Exchange Request logic
-  try {
     // Salesforce CRM Access Token Payload
     const salesforceCrmTokenPayload = new URLSearchParams({
       grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
@@ -132,39 +139,47 @@ export const handler = async (event) => {
 
     const dataCloudResponseData = await dataCloudResponse.json();
     const dataCloudInstanceUrl = dataCloudResponseData.instance_url;
-    const tokenExpiration = dataCloudResponseData.expires_in;
+    dataCloudToken = dataCloudResponseData.access_token;
+    fetchedDataCloudInstanceUrl = dataCloudInstanceUrl;
+
+    // save jwt token to dynamodb
+    const tokenExpiration =
+      dataCloudResponseData.expires_in + Math.round(Date.now() / 1000);
+    try {
+      await dynamo.send(
+        new PutCommand({
+          TableName: tableName,
+          Item: {
+            jwt: dataCloudResponseData.access_token,
+            expires_at: tokenExpiration,
+            dataCloudInstanceUrl,
+          },
+        })
+      );
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
+  }
+
+  try {
+    const dataCloudIngestionApiUrl = `https://${
+      dataCloudInstanceUrl ? dataCloudInstanceUrl : fetchedDataCloudInstanceUrl
+    }/api/v1/ingest/sources/${secret.INGESTION_SOURCE_API_NAME}/${
+      event.queryStringParameters.objectName
+    }`;
     const body = JSON.parse(event.body);
     const dataCloudObject = {
       data: [body],
     };
 
-    if (!tokenCached) {
-      // save jwt token to dynamodb
-      try {
-        await dynamo.send(
-          new PutCommand({
-            TableName: tableName,
-            Item: {
-              jwt: token,
-              expires_in: tokenExpiration,
-            },
-          })
-        );
-      } catch (error) {
-        console.error(error);
-        throw error;
-      }
-    }
-
     // Data Cloud Object Request
     const dataCloudIngestionApiResponse = await fetch(
-      "https://" +
-        dataCloudInstanceUrl +
-        `/api/v1/ingest/sources/${secret.INGESTION_SOURCE_API_NAME}/${event.queryStringParameters.objectName}`,
+      dataCloudIngestionApiUrl,
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${cdpResponseData.access_token}`,
+          Authorization: `Bearer ${cachedJwt ? cachedJwt : dataCloudToken}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(dataCloudObject),
@@ -179,12 +194,19 @@ export const handler = async (event) => {
     const lambdaResponse = {
       statusCode: 200,
       body: JSON.stringify(
-        "The following data was just sent to Data Cloud: " + dataCloudObject
+        "The following data was just sent to Data Cloud: " +
+          JSON.stringify(dataCloudObject)
       ),
     };
 
     return lambdaResponse;
   } catch (error) {
+    const lambdaResponse = {
+      statusCode: 500,
+      body: JSON.stringify("There was an issue with the Lambda function!"),
+    };
     console.log("Error", error);
+
+    return lambdaResponse;
   }
 };

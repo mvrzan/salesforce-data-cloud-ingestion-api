@@ -15,7 +15,7 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 // initialize DynamoDB client
 const dynamodbClient = new DynamoDBClient();
 const dynamo = DynamoDBDocumentClient.from(dynamodbClient);
-const tableName = "data-cloud-jwt";
+const tableName = process.env.DYNAMODB_TABLE_NAME;
 
 // create global variables to store the JWT token and its expiration time
 let cachedJwt; // JWT token
@@ -44,7 +44,7 @@ try {
 }
 
 // initialize AWS Secrets Manager client
-const secret_name = "data-cloud-makana";
+const secret_name = process.env.SECRET_NAME;
 const client = new SecretsManagerClient({
   region: "us-east-2",
 });
@@ -179,7 +179,7 @@ export const handler = async (event) => {
       data: [body],
     };
 
-    // Data Cloud Ingestion API Request
+    // Send data to Data Cloud Ingestion API endpoint
     const dataCloudIngestionApiResponse = await fetch(
       dataCloudIngestionApiUrl,
       {
@@ -194,9 +194,12 @@ export const handler = async (event) => {
       }
     );
 
+    // Check if the response is not successful
     if (!dataCloudIngestionApiResponse.ok) {
+      const errorText = await dataCloudIngestionApiResponse.text();
+      console.error("Data Cloud Ingestion API Error:", errorText);
       throw new Error(
-        "HTTP error, status = " + dataCloudIngestionApiResponse.status
+        `HTTP error, status = ${dataCloudIngestionApiResponse.status}`
       );
     }
 
@@ -213,7 +216,10 @@ export const handler = async (event) => {
     console.error("Error", error);
     const errorResponse = {
       statusCode: 500,
-      body: JSON.stringify("There was an issue with the Lambda function!"),
+      body: JSON.stringify(
+        "There was an issue with the Lambda function!",
+        error
+      ),
       error: error.message,
     };
 

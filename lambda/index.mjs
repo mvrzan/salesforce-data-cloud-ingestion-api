@@ -16,12 +16,15 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 const dynamodbClient = new DynamoDBClient();
 const dynamo = DynamoDBDocumentClient.from(dynamodbClient);
 const tableName = "data-cloud-jwt";
-let cachedJwt;
-let cachedJwtExpiresAt;
-let dataCloudInstanceUrl;
-let fetchedDataCloudInstanceUrl;
-let dataCloudToken;
 
+// create global variables to store the JWT token and its expiration time
+let cachedJwt; // JWT token
+let cachedJwtExpiresAt; // JWT token expiration time
+let dataCloudInstanceUrl; // Data Cloud instance URL
+let fetchedDataCloudInstanceUrl; // Data Cloud instance URL fetched from the token exchange
+let fetchedDataCloudToken; // Data Cloud token fetched from the token exchange
+
+// fetch the last JWT token from the DynamoDB table
 try {
   const { Items } = await dynamo.send(
     new ScanCommand({
@@ -29,22 +32,18 @@ try {
     })
   );
 
+  // check if there is a JWT token in the DynamoDB table
   if (Items.length >= 1) {
     const lastRecord = Items[Items.length - 1];
     cachedJwt = lastRecord.jwt;
     cachedJwtExpiresAt = lastRecord.expires_at;
     dataCloudInstanceUrl = lastRecord.dataCloudInstanceUrl;
-
-    console.log("JWT Token", cachedJwt);
-  } else {
-    console.log("No JWT token found in the DynamoDB table!");
   }
 } catch (error) {
   console.error(error);
-  throw error;
 }
 
-// get the secret from AWS Secrets Manager
+// initialize AWS Secrets Manager client
 const secret_name = "data-cloud-makana";
 const client = new SecretsManagerClient({
   region: "us-east-2",
@@ -52,6 +51,7 @@ const client = new SecretsManagerClient({
 
 let response;
 
+// get the secret from AWS Secrets Manager
 try {
   response = await client.send(
     new GetSecretValueCommand({
@@ -61,9 +61,9 @@ try {
   );
 } catch (error) {
   console.error(error);
-  throw error;
 }
 
+// parse the secret string on a global variable
 const secret = JSON.parse(response.SecretString);
 
 export const handler = async (event) => {
@@ -97,8 +97,10 @@ export const handler = async (event) => {
       grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
       assertion: token,
     });
+
+    // Salesforce CRM Access Token Request
     const salesforceCrmResponse = await fetch(
-      "https://" + secret.LOGIN_URL + "/services/oauth2/token",
+      `https://${secret.LOGIN_URL}/services/oauth2/token`,
       {
         method: "POST",
         headers: {
@@ -123,7 +125,7 @@ export const handler = async (event) => {
 
     // Data Cloud Token Exchange Request
     const dataCloudResponse = await fetch(
-      salesforceCrmResponseData.instance_url + "/services/a360/token",
+      `${salesforceCrmResponseData.instance_url}/services/a360/token`,
       {
         method: "POST",
         headers: {
@@ -137,9 +139,12 @@ export const handler = async (event) => {
       throw new Error("HTTP error, status = " + dataCloudResponse.status);
     }
 
+    // parse the response from the Data Cloud token exchange
     const dataCloudResponseData = await dataCloudResponse.json();
     const dataCloudInstanceUrl = dataCloudResponseData.instance_url;
-    dataCloudToken = dataCloudResponseData.access_token;
+
+    // store the fetched JWT token and its expiration time
+    fetchedDataCloudToken = dataCloudResponseData.access_token;
     fetchedDataCloudInstanceUrl = dataCloudInstanceUrl;
 
     // save jwt token to dynamodb
@@ -163,6 +168,7 @@ export const handler = async (event) => {
   }
 
   try {
+    // Data Cloud Ingestion API URL
     const dataCloudIngestionApiUrl = `https://${
       dataCloudInstanceUrl ? dataCloudInstanceUrl : fetchedDataCloudInstanceUrl
     }/api/v1/ingest/sources/${secret.INGESTION_SOURCE_API_NAME}/${
@@ -173,40 +179,45 @@ export const handler = async (event) => {
       data: [body],
     };
 
-    // Data Cloud Object Request
+    // Data Cloud Ingestion API Request
     const dataCloudIngestionApiResponse = await fetch(
       dataCloudIngestionApiUrl,
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${cachedJwt ? cachedJwt : dataCloudToken}`,
+          Authorization: `Bearer ${
+            cachedJwt ? cachedJwt : fetchedDataCloudToken
+          }`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(dataCloudObject),
       }
     );
 
-    console.log(
-      "Data Cloud Response",
-      await dataCloudIngestionApiResponse.json()
-    );
+    if (!dataCloudIngestionApiResponse.ok) {
+      throw new Error(
+        "HTTP error, status = " + dataCloudIngestionApiResponse.status
+      );
+    }
 
-    const lambdaResponse = {
+    const successfulResponse = {
       statusCode: 200,
       body: JSON.stringify(
         "The following data was just sent to Data Cloud: " +
           JSON.stringify(dataCloudObject)
       ),
+      processedData: dataCloudObject,
     };
 
-    return lambdaResponse;
+    return successfulResponse;
   } catch (error) {
-    const lambdaResponse = {
+    const errorResponse = {
       statusCode: 500,
       body: JSON.stringify("There was an issue with the Lambda function!"),
+      error: error.message,
     };
-    console.log("Error", error);
+    console.error("Error", error);
 
-    return lambdaResponse;
+    return errorResponse;
   }
 };

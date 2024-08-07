@@ -136,7 +136,12 @@ export const handler = async (event) => {
     );
 
     if (!dataCloudResponse.ok) {
-      throw new Error("HTTP error, status = " + dataCloudResponse.status);
+      const status = dataCloudResponse.status;
+      const errorText = dataCloudResponse.statusText;
+      console.error("Data Cloud Token Exchange Error:", errorText);
+      throw new Error(
+        `HTTP error when exchanging token with Data Cloud, status = ${status}`
+      );
     }
 
     // parse the response from the Data Cloud token exchange
@@ -196,10 +201,11 @@ export const handler = async (event) => {
 
     // Check if the response is not successful
     if (!dataCloudIngestionApiResponse.ok) {
-      const errorText = await dataCloudIngestionApiResponse.text();
+      const status = dataCloudIngestionApiResponse.status;
+      const errorText = dataCloudIngestionApiResponse.statusText;
       console.error("Data Cloud Ingestion API Error:", errorText);
       throw new Error(
-        `HTTP error, status = ${dataCloudIngestionApiResponse.status}`
+        `HTTP error when sending data to Data Cloud Ingestion API, status = ${status}`
       );
     }
 
@@ -213,14 +219,12 @@ export const handler = async (event) => {
 
     return successfulResponse;
   } catch (error) {
-    console.error("Error", error);
+    console.error("Error has occurred:", error);
     const errorResponse = {
       statusCode: 500,
       body: JSON.stringify(
-        "There was an issue with the Lambda function!",
-        error
+        `There was an issue with the Lambda function: ${error}`
       ),
-      error: error.message,
     };
 
     return errorResponse;

@@ -1,0 +1,99 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: "AWS::Serverless-2016-10-31"
+Resources:
+  DataCloudIngestionFunction:
+    Type: "AWS::Serverless::Function"
+    Properties:
+      Handler: handler
+      Runtime: nodejs20.x
+      CodeUri: .
+      MemorySize: 128
+      Timeout: 30
+      Environment:
+        Variables:
+          SECRET_NAME: !Ref DataCloudSecretsManagerSecret
+          DYNAMODB_TABLE_NAME: !Ref DataCloudDynamoDBTable
+      Policies:
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: "Allow"
+              Action:
+                - "secretsmanager:GetSecretValue"
+              Resource: !Ref DataCloudSecretsManagerSecret
+            - Effect: "Allow"
+              Action:
+                - "dynamodb:GetItem"
+                - "dynamodb:PutItem"
+                - "dynamodb:UpdateItem"
+                - "dynamodb:Scan"
+              Resource: !GetAtt DataCloudDynamoDBTable.Arn
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /ingest
+            Method: post
+
+  DataCloudDynamoDBTable:
+    Type: "AWS::DynamoDB::Table"
+    Properties:
+      TableName: data-cloud-jwt-sam
+      AttributeDefinitions:
+        - AttributeName: "jwt"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "jwt"
+          KeyType: "HASH"
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+
+  # Note that the secret values are just examples and should be replaced with real values
+  DataCloudSecretsManagerSecret:
+    Type: "AWS::SecretsManager::Secret"
+    Properties:
+      Name: !Sub "${AWS::StackName}-DataCloudSecret"
+      Description: "Secret for Data Cloud"
+      CLIENT_ID: "2MO_w2n1AqT7ItBzfdas342fdasf897fdas"
+      CLIENT_SECRET: "pfdsaf32434fddasfsdgjioh3"
+      USERNAME: "john.doe@example.com"
+      PASSWORDL: "password123"
+      SECURITY_TOKEN": "securitytoken"
+      SALESFORCE_INSTANCE_URL: "https://test-instance.my.salesforce.com"
+      LOGIN_URL: "login.salesforce.com"
+      RSA_PRIVATE_KEY: "V3Q2RQZm93eGFvZW13Vys5OGFnQ1dCQTErZGlNMTkrc..."
+      INGESTION_SOURCE_API_NAME: "test-api"
+
+  DataCloudApiGateway:
+    Type: "AWS::Serverless::Api"
+    Properties:
+      StageName: prod
+      DefinitionBody:
+        swagger: "2.0"
+        info:
+          title: "Data Cloud API"
+        paths:
+          /ingest:
+            post:
+              x-amazon-apigateway-integration:
+                type: "AWS_PROXY"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DataCloudIngestionFunction.Arn}/invocations"
+                httpMethod: "POST"
+                responses: {}
+
+Outputs:
+  DataCloudIngestionFunctionArn:
+    Description: "ARN of the Data Cloud Ingestion Lambda Function"
+    Value: !GetAtt DataCloudIngestionFunction.Arn
+
+  DataCloudDynamoDBTableName:
+    Description: "Name of the created DynamoDB table"
+    Value: !Ref DataCloudDynamoDBTable
+
+  DataCloudSecretsManagerSecretArn:
+    Description: "ARN of the Secrets Manager secret"
+    Value: !Ref DataCloudSecretsManagerSecret
+
+  DataCloudApiGatewayUrl:
+    Description: "URL of the Data Cloud API Gateway"
+    Value: !Sub "https://${DataCloudApiGateway}.execute-api.${AWS::Region}.amazonaws.com/prod/ingest"

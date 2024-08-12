@@ -13,7 +13,6 @@ This project showcases how to use the Data Cloud Ingestion API via serverless ar
   - [What does it do?](#what-does-it-do)
   - [How does it work?](#how-does-it-work)
     - [Architecture diagram](#architecture-diagram)
-    - [Architecture diagram](#architecture-diagram-1)
 - [Configuration](#configuration)
   - [Install the AWS CLI](#install-the-aws-cli)
   - [License](#license)
@@ -37,8 +36,6 @@ The provided node.js function handles the following:
 - Finally, it pushes the data to the Data Cloud Ingestion API
 
 ## How does it work?
-
-### Architecture diagram
 
 ### Architecture diagram
 

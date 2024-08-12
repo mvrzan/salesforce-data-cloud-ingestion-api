@@ -58,10 +58,7 @@ Resources:
       SecretString: !Sub |
         {
           "CLIENT_ID": "2MO_w2n1AqT7ItBzfdas342fdasf897fdas",
-          "CLIENT_SECRET": "pfdsaf32434fddasfsdgjioh3",
           "USERNAME": "john.doe@example.com",
-          "PASSWORD": "password123",
-          "SECURITY_TOKEN": "securitytoken",
           "SALESFORCE_INSTANCE_URL": "https://test-instance.my.salesforce.com",
           "LOGIN_URL": "login.salesforce.com",
           "RSA_PRIVATE_KEY": "V3Q2RQZm93eGFvZW13Vys5OGFnQ1dCQTErZGlNMTkrc...",

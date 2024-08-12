@@ -17,6 +17,8 @@ This project showcases how to use the Data Cloud Ingestion API via serverless ar
   - [Requirements](#requirements)
   - [Deployment to AWS](#deployment-to-aws)
     - [Where to get the variables](#where-to-get-the-variables)
+    - [YAML template updates](#yaml-template-updates)
+    - [AWS SAM deployment](#aws-sam-deployment)
   - [Deployment to Azure](#deployment-to-azure)
   - [License](#license)
   - [Disclaimer](#disclaimer)
@@ -111,9 +113,11 @@ This encoded string is going to be your `RSA_PRIVATE_KEY` variable.
 
 **Note:** We have encoded the key because otherwise, the Secrets Manager would break the formatting casing issues with the authentication.
 
+### YAML template updates
+
 Once you have all the variables in your `template.yaml` file, save the file and proceed to the next step.
 
-The first step is to zip the contents of the `aws/` folder. This means you will zip the following files and folders:
+The next step is to zip the contents of the `aws/` folder. This means you will zip the following files and folders:
 
 ```
 template.yaml
@@ -125,9 +129,46 @@ src/
 
 > Does this structure matter? Yes, it does matter as a specific folder structure has to be followed when uploading a Lambda function.
 
-The next step is to log into the AWS Console and open the AWS CloudShell by clicking on the CloudShell icon in the bottom left of the AWS Console.
+### AWS SAM deployment
+
+Log into the AWS Console and open the AWS CloudShell by clicking on the CloudShell icon in the bottom left of the AWS Console.
 
 Once the CloudShell terminal opens, on the right-hand side, you will see a button labeled **Actions**. Click on it and select **Upload file** and select your zip file.
+
+Run the following commands in the CloudShell:
+
+```
+sam build
+```
+
+Once the build step finishes, run the following command:
+
+```
+sam deploy --guided
+```
+
+This step will guide you through the deployment and ask the following questions:
+
+```
+ Stack Name [sam-app]: the name of the CloudFormation stack that will be deployed
+
+ AWS Region [us-east-2]: default AWS region where this stack will be deployed
+
+ Shows you resources changes to be deployed and require a 'Y' to initiate deploy: do you want an extra validation step before deploying the resources
+
+ SAM needs permission to be able to create roles to connect to the resources in your template: allow SAM to create roles to connect the necessary resources
+
+ preserves the state of previously provisioned resources when an operation fails: do you want to keep the deployed resources in case something fails
+
+ DataCloudIngestionFunction has no authentication. Is this okay? [y/N]: Yes, this is ok for this example
+
+ Save arguments to configuration file [Y/n]: Do you want to save the arguments for future use?
+
+```
+
+Once the deployment is successful, you will see the endpoint URL in the terminal output section and you can send your requests there!
+
+That is it! You have successfully deployed this project into an AWS account using SAM.
 
 ## Deployment to Azure
 

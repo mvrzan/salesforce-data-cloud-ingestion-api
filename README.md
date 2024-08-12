@@ -11,6 +11,9 @@ This project showcases how to use the Data Cloud Ingestion API via serverless ar
 - [Data Cloud Ingestion API via AWS and Azure](#data-cloud-ingestion-api-via-aws-and-azure)
 - [Table of Contents](#table-of-contents)
   - [What does it do?](#what-does-it-do)
+  - [How does it work?](#how-does-it-work)
+    - [Architecture diagram](#architecture-diagram)
+    - [Architecture diagram](#architecture-diagram-1)
 - [Configuration](#configuration)
   - [Install the AWS CLI](#install-the-aws-cli)
 
@@ -19,6 +22,16 @@ This project showcases how to use the Data Cloud Ingestion API via serverless ar
 ## What does it do?
 
 It does stuff!
+
+## How does it work?
+
+### Architecture diagram
+
+### Architecture diagram
+
+| AWS Architecture                        | Azure Architecture                        |
+| --------------------------------------- | ----------------------------------------- |
+| ![](./screenshots/aws-architecture.png) | ![](./screenshots/azure-architecture.png) |
 
 # Configuration
 

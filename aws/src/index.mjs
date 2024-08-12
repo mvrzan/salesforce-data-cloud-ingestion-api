@@ -67,112 +67,112 @@ try {
 const secret = JSON.parse(response.SecretString);
 
 export const handler = async (event) => {
-  // check if the token is still valid
-  if (
-    !cachedJwtExpiresAt ||
-    cachedJwtExpiresAt - Math.round(Date.now() / 1000) < 3600
-  ) {
-    console.log("Token is expired. Fetching a new token!");
-
-    // define jwt payload
-    const tokenPayload = {
-      iss: secret.CLIENT_ID,
-      sub: secret.USERNAME,
-      aud: secret.LOGIN_URL,
-      exp: Math.round(Date.now() / 1000),
-    };
-
-    // decode base64 encoded rsa key from the AWS Secret Manager
-    const rsaKey = Buffer.from(secret.RSA_PRIVATE_KEY, "base64").toString(
-      "ascii"
-    );
-
-    // create and sign jwt
-    const token = jwt.sign(tokenPayload, rsaKey, {
-      algorithm: "RS256",
-    });
-
-    // Salesforce CRM Access Token Payload
-    const salesforceCrmTokenPayload = new URLSearchParams({
-      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      assertion: token,
-    });
-
-    // Salesforce CRM Access Token Request
-    const salesforceCrmResponse = await fetch(
-      `https://${secret.LOGIN_URL}/services/oauth2/token`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: salesforceCrmTokenPayload,
-      }
-    );
-
-    if (!salesforceCrmResponse.ok) {
-      throw new Error("HTTP error, status = " + salesforceCrmResponse.status);
-    }
-
-    const salesforceCrmResponseData = await salesforceCrmResponse.json();
-
-    // Data Cloud Token Exchange Payload
-    const dataCloudPayload = new URLSearchParams({
-      grant_type: "urn:salesforce:grant-type:external:cdp",
-      subject_token: salesforceCrmResponseData.access_token,
-      subject_token_type: "urn:ietf:params:oauth:token-type:access_token",
-    });
-
-    // Data Cloud Token Exchange Request
-    const dataCloudResponse = await fetch(
-      `${salesforceCrmResponseData.instance_url}/services/a360/token`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: dataCloudPayload,
-      }
-    );
-
-    if (!dataCloudResponse.ok) {
-      const status = dataCloudResponse.status;
-      const errorText = dataCloudResponse.statusText;
-      console.error("Data Cloud Token Exchange Error:", errorText);
-      throw new Error(
-        `HTTP error when exchanging token with Data Cloud, status = ${status}`
-      );
-    }
-
-    // parse the response from the Data Cloud token exchange
-    const dataCloudResponseData = await dataCloudResponse.json();
-    const dataCloudInstanceUrl = dataCloudResponseData.instance_url;
-
-    // store the fetched JWT token and its expiration time
-    fetchedDataCloudToken = dataCloudResponseData.access_token;
-    fetchedDataCloudInstanceUrl = dataCloudInstanceUrl;
-
-    // save jwt token to dynamodb
-    const tokenExpiration =
-      dataCloudResponseData.expires_in + Math.round(Date.now() / 1000);
-    try {
-      await dynamo.send(
-        new PutCommand({
-          TableName: tableName,
-          Item: {
-            jwt: dataCloudResponseData.access_token,
-            expires_at: tokenExpiration,
-            dataCloudInstanceUrl,
-          },
-        })
-      );
-    } catch (error) {
-      console.error(error);
-      throw error;
-    }
-  }
-
   try {
+    // check if the token is still valid
+    if (
+      !cachedJwtExpiresAt ||
+      cachedJwtExpiresAt - Math.round(Date.now() / 1000) < 3600
+    ) {
+      console.log("Token is expired. Fetching a new token!");
+
+      // define jwt payload
+      const tokenPayload = {
+        iss: secret.CLIENT_ID,
+        sub: secret.USERNAME,
+        aud: secret.LOGIN_URL,
+        exp: Math.round(Date.now() / 1000),
+      };
+
+      // decode base64 encoded rsa key from the AWS Secret Manager
+      const rsaKey = Buffer.from(secret.RSA_PRIVATE_KEY, "base64").toString(
+        "ascii"
+      );
+
+      // create and sign jwt
+      const token = jwt.sign(tokenPayload, rsaKey, {
+        algorithm: "RS256",
+      });
+
+      // Salesforce CRM Access Token Payload
+      const salesforceCrmTokenPayload = new URLSearchParams({
+        grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+        assertion: token,
+      });
+
+      // Salesforce CRM Access Token Request
+      const salesforceCrmResponse = await fetch(
+        `https://${secret.LOGIN_URL}/services/oauth2/token`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: salesforceCrmTokenPayload,
+        }
+      );
+
+      if (!salesforceCrmResponse.ok) {
+        throw new Error("HTTP error, status = " + salesforceCrmResponse.status);
+      }
+
+      const salesforceCrmResponseData = await salesforceCrmResponse.json();
+
+      // Data Cloud Token Exchange Payload
+      const dataCloudPayload = new URLSearchParams({
+        grant_type: "urn:salesforce:grant-type:external:cdp",
+        subject_token: salesforceCrmResponseData.access_token,
+        subject_token_type: "urn:ietf:params:oauth:token-type:access_token",
+      });
+
+      // Data Cloud Token Exchange Request
+      const dataCloudResponse = await fetch(
+        `${salesforceCrmResponseData.instance_url}/services/a360/token`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: dataCloudPayload,
+        }
+      );
+
+      if (!dataCloudResponse.ok) {
+        const status = dataCloudResponse.status;
+        const errorText = dataCloudResponse.statusText;
+        console.error("Data Cloud Token Exchange Error:", errorText);
+        throw new Error(
+          `HTTP error when exchanging token with Data Cloud, status = ${status}`
+        );
+      }
+
+      // parse the response from the Data Cloud token exchange
+      const dataCloudResponseData = await dataCloudResponse.json();
+      const dataCloudInstanceUrl = dataCloudResponseData.instance_url;
+
+      // store the fetched JWT token and its expiration time
+      fetchedDataCloudToken = dataCloudResponseData.access_token;
+      fetchedDataCloudInstanceUrl = dataCloudInstanceUrl;
+
+      // save jwt token to dynamodb
+      const tokenExpiration =
+        dataCloudResponseData.expires_in + Math.round(Date.now() / 1000);
+      try {
+        await dynamo.send(
+          new PutCommand({
+            TableName: tableName,
+            Item: {
+              jwt: dataCloudResponseData.access_token,
+              expires_at: tokenExpiration,
+              dataCloudInstanceUrl,
+            },
+          })
+        );
+      } catch (error) {
+        console.error(error);
+        throw error;
+      }
+    }
+
     // Data Cloud Ingestion API URL
     const dataCloudIngestionApiUrl = `https://${
       dataCloudInstanceUrl ? dataCloudInstanceUrl : fetchedDataCloudInstanceUrl

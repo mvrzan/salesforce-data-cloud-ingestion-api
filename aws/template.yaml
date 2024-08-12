@@ -4,9 +4,9 @@ Resources:
   DataCloudIngestionFunction:
     Type: "AWS::Serverless::Function"
     Properties:
-      Handler: handler
+      Handler: index.handler
       Runtime: nodejs20.x
-      CodeUri: .
+      CodeUri: src/
       MemorySize: 128
       Timeout: 30
       Environment:
@@ -26,10 +26,11 @@ Resources:
                 - "dynamodb:PutItem"
                 - "dynamodb:UpdateItem"
                 - "dynamodb:Scan"
+                - "secretsmanager:GetSecretValue"
               Resource: !GetAtt DataCloudDynamoDBTable.Arn
       Events:
         ApiEvent:
-          Type: Api
+          Type: HttpApi
           Properties:
             Path: /ingest
             Method: post
@@ -67,22 +68,22 @@ Resources:
           "INGESTION_SOURCE_API_NAME": "test-api"
         }
 
-  DataCloudApiGateway:
-    Type: "AWS::Serverless::Api"
-    Properties:
-      StageName: prod
-      DefinitionBody:
-        swagger: "2.0"
-        info:
-          title: "Data Cloud API"
-        paths:
-          /ingest:
-            post:
-              x-amazon-apigateway-integration:
-                type: "AWS_PROXY"
-                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DataCloudIngestionFunction.Arn}/invocations"
-                httpMethod: "POST"
-                responses: {}
+  # DataCloudApiGateway:
+  #   Type: "AWS::Serverless::Api"
+  #   Properties:
+  #     StageName: prod
+  #     DefinitionBody:
+  #       swagger: "2.0"
+  #       info:
+  #         title: "Data Cloud API"
+  #       paths:
+  #         /ingest:
+  #           post:
+  #             x-amazon-apigateway-integration:
+  #               type: "AWS_PROXY"
+  #               uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DataCloudIngestionFunction.Arn}/invocations"
+  #               httpMethod: "POST"
+  #               responses: {}
 
 Outputs:
   DataCloudIngestionFunctionArn:
@@ -99,4 +100,4 @@ Outputs:
 
   DataCloudApiGatewayUrl:
     Description: "URL of the Data Cloud API Gateway"
-    Value: !Sub "https://${DataCloudApiGateway}.execute-api.${AWS::Region}.amazonaws.com/prod/ingest"
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/ingest"

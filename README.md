@@ -61,11 +61,25 @@ Once this step is completed, it is time to deploy the function to your preferred
 
 ## Deployment to AWS
 
-Before you begin, please ensure you have a valid AWS account.
+As stated before, this is a simple example how to deploy this solution to AWS using the Serverless Application Model, also known as SAM. In this walkthrough, the [AWS CloudShell](https://docs.aws.amazon.com/cloudshell/latest/userguide/getting-started.html) will be used instead of a local terminal.
+
+> Before you begin, please ensure you have a valid AWS account.
+
+The first step is to zip the contents of the `aws/` folder. This means you will zip the following files and folders:
+
+```
+template.yaml
+src/
+ ├── index.js
+ └── package.json
+ └── package-lock.json
+```
 
 ## Deployment to Azure
 
-Before you begin, please ensure you have a valid Azure account.
+🚧 **UNDER CONSTRUCTION**
+
+> Before you begin, please ensure you have a valid Azure account.
 
 ## License
 

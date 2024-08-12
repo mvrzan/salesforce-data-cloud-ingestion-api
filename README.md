@@ -14,7 +14,9 @@ This project showcases how to use the Data Cloud Ingestion API via serverless ar
   - [How does it work?](#how-does-it-work)
     - [Architecture diagram](#architecture-diagram)
 - [Configuration](#configuration)
-  - [Install the AWS CLI](#install-the-aws-cli)
+  - [Requirements](#requirements)
+  - [Deployment to AWS](#deployment-to-aws)
+  - [Deployment to Azure](#deployment-to-azure)
   - [License](#license)
   - [Disclaimer](#disclaimer)
 
@@ -47,9 +49,23 @@ The provided node.js function handles the following:
 
 # Configuration
 
-## Install the AWS CLI
+## Requirements
 
-The very first step in deploying the AWS infrastructure is to install the AWS command line. The instructions can be found [here](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html).
+In order to deploy and test this application yourself, you first need to handle the authorization to your Salesforce instance:
+
+In the [Get Started with Ingestion API](https://developer.salesforce.com/docs/atlas.en-us.c360a_api.meta/c360a_api/c360a_api_get_started.htm) official documentation, complete the **Authentication** portion where you create a [Connected App](https://help.salesforce.com/s/articleView?id=sf.connected_app_create.htm&type=5) in your Salesforce instance.
+
+Once this step is completed, it is time to deploy the function to your preferred cloud.
+
+**Note:** There are multiple ways how code can be deployed to public clouds and there is no _right_ way of doing things. Proposed deployment steps are meant only as a ease of use and you are welcome to change them as you see fit.
+
+## Deployment to AWS
+
+Before you begin, please ensure you have a valid AWS account.
+
+## Deployment to Azure
+
+Before you begin, please ensure you have a valid Azure account.
 
 ## License
 

@@ -19,6 +19,7 @@ This project showcases how to use the Data Cloud Ingestion API via serverless ar
     - [Where to get the variables](#where-to-get-the-variables)
     - [YAML template updates](#yaml-template-updates)
     - [AWS SAM deployment](#aws-sam-deployment)
+  - [Using the public endpoint](#using-the-public-endpoint)
   - [Deployment to Azure](#deployment-to-azure)
   - [License](#license)
   - [Disclaimer](#disclaimer)
@@ -171,6 +172,14 @@ Once the deployment is successful, you will see the endpoint URL in the terminal
 That is it! You have successfully deployed this project into an AWS account using SAM.
 
 **NOTE:** Please note that you have now deployed a public endpoint with 0 authentication. You bare all the responsibility for having unauthenticated public endpoint that may incur unforeseen costs to your AWS account. This is a simple proof of concept, hence why there is not authentication in place.
+
+## Using the public endpoint
+
+Once you have the endpoint deployed, you are able to use it by passing the Data Cloud Ingestion API object name into the query parameters. Here's an example:
+
+`https://8fdsa980.execute-api.us-east-2.amazonaws.com/dataCloudIngestionApi?objectName=UserLoggedIn`
+
+The portion after your endpoint `objectName=<objectName>` is what is going to point to the Data Cloud Ingestion API connector which event it should process (these events you've defined in your YAML schema).
 
 ## Deployment to Azure
 

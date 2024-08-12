@@ -68,23 +68,6 @@ Resources:
           "INGESTION_SOURCE_API_NAME": "test-api"
         }
 
-  # DataCloudApiGateway:
-  #   Type: "AWS::Serverless::Api"
-  #   Properties:
-  #     StageName: prod
-  #     DefinitionBody:
-  #       swagger: "2.0"
-  #       info:
-  #         title: "Data Cloud API"
-  #       paths:
-  #         /ingest:
-  #           post:
-  #             x-amazon-apigateway-integration:
-  #               type: "AWS_PROXY"
-  #               uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DataCloudIngestionFunction.Arn}/invocations"
-  #               httpMethod: "POST"
-  #               responses: {}
-
 Outputs:
   DataCloudIngestionFunctionArn:
     Description: "ARN of the Data Cloud Ingestion Lambda Function"

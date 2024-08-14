@@ -48,7 +48,7 @@ try {
   });
 
   const { resources: items } = await container.items
-    .query("SELECT * FROM c")
+    .query({ query: "SELECT * FROM c" })
     .fetchAll();
 
   if (items.length >= 1) {
@@ -164,6 +164,8 @@ export const handler = async (context, req) => {
         dataCloudInstanceUrl,
       });
     }
+
+    context.log("Token is valid. Proceeding with the request processing.");
 
     // Data Cloud Ingestion API URL
     const dataCloudIngestionApiUrl = `https://${

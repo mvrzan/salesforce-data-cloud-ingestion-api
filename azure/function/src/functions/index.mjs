@@ -22,9 +22,6 @@ console.log("Azure Key Vault successfully initialized.");
 // Retrieve secrets from Azure Key Vault
 const { value: clientId } = await secretClient.getSecret("CLIENT-ID");
 const { value: username } = await secretClient.getSecret("USERNAME");
-const { value: salesforceInstanceUrl } = await secretClient.getSecret(
-  "SALESFORCE-INSTANCE-URL"
-);
 const { value: privateKey } = await secretClient.getSecret("RSA-PRIVATE-KEY");
 const { value: loginUrl } = await secretClient.getSecret("LOGIN-URL");
 const { value: ingestionSourceApiName } = await secretClient.getSecret(
@@ -68,9 +65,6 @@ export const handler = async (context, req) => {
   try {
     context.log("Azure Function handler called");
 
-    context.log("Request body:", req.body);
-    context.log("Query string parameters:", req.query);
-
     // check if the token is still valid
     if (
       !cachedJwtExpiresAt ||
@@ -86,7 +80,7 @@ export const handler = async (context, req) => {
         exp: Math.round(Date.now() / 1000),
       };
 
-      // decode base64 encoded rsa key from the AWS Secret Manager
+      // decode base64 encoded rsa key from the Azure Key Vault
       const rsaKey = Buffer.from(privateKey, "base64").toString("ascii");
 
       // create and sign jwt

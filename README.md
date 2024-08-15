@@ -34,7 +34,7 @@ The provided node.js function handles the following:
 
 - Accepts the incoming JSON payload
 - Reads from a non-SQL database (DynamoDB or CosmosDB) for the token value and expiration
-- If the token has expired, it fetches sensitive environmental variables from the secure storage (Secrets Manager or Azure Key Vault)
+- If the token has expired, it fetches sensitive environment variables from the secure storage (Secrets Manager or Azure Key Vault)
 - Fetches the Salesforce Access Token
 - Exchanges the Salesforce Access Token for Data Cloud Access Token
 - Caches the new token into the non-SQL database for future use

@@ -181,11 +181,7 @@ The portion after your endpoint `objectName=<objectName>` is what is going to po
 
 ## Deployment to Azure
 
-🚧 **UNDER CONSTRUCTION**
-
-> Before you begin, please ensure you have a valid Azure account.
-
-Registering Azure CloudShell: https://learn.microsoft.com/en-us/azure/cloud-shell/get-started/classic?tabs=azurecli
+Compared to the AWS option, I will not go through step by step process on how to deploy the solution on top of Azure. Why? Mostly because my Azure account has limited permissions and I cannot validate if it is working properly or not. For details on Azure cloud deployments, explore the [official documentation](https://learn.microsoft.com/en-us/azure/azure-resource-manager/templates/deploy-cli).
 
 ## License
 

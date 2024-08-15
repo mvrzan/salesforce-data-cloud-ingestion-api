@@ -12,11 +12,6 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 
-// initialize DynamoDB client
-const dynamodbClient = new DynamoDBClient();
-const dynamo = DynamoDBDocumentClient.from(dynamodbClient);
-const tableName = process.env.DYNAMODB_TABLE_NAME;
-
 // create global variables to store the JWT token and its expiration time
 let cachedJwt; // JWT token
 let cachedJwtExpiresAt; // JWT token expiration time
@@ -24,24 +19,13 @@ let dataCloudInstanceUrl; // Data Cloud instance URL
 let fetchedDataCloudInstanceUrl; // Data Cloud instance URL fetched from the token exchange
 let fetchedDataCloudToken; // Data Cloud token fetched from the token exchange
 
-// fetch the last JWT token from the DynamoDB table
-try {
-  const { Items } = await dynamo.send(
-    new ScanCommand({
-      TableName: tableName,
-    })
-  );
+// create global variable to store Secrets Manager object
+let secret;
 
-  // check if there is a JWT token in the DynamoDB table
-  if (Items.length >= 1) {
-    const lastRecord = Items[Items.length - 1];
-    cachedJwt = lastRecord.jwt;
-    cachedJwtExpiresAt = lastRecord.expires_at;
-    dataCloudInstanceUrl = lastRecord.dataCloudInstanceUrl;
-  }
-} catch (error) {
-  console.error(error);
-}
+// initialize DynamoDB client
+const dynamodbClient = new DynamoDBClient();
+const dynamo = DynamoDBDocumentClient.from(dynamodbClient);
+const tableName = process.env.DYNAMODB_TABLE_NAME;
 
 // initialize AWS Secrets Manager client
 const secret_name = process.env.SECRET_NAME;
@@ -49,25 +33,35 @@ const client = new SecretsManagerClient({
   region: "us-east-2",
 });
 
-let response;
-
-// get the secret from AWS Secrets Manager
-try {
-  response = await client.send(
-    new GetSecretValueCommand({
-      SecretId: secret_name,
-      VersionStage: "AWSCURRENT",
-    })
-  );
-} catch (error) {
-  console.error(error);
-}
-
-// parse the secret string on a global variable
-const secret = JSON.parse(response.SecretString);
-
 export const handler = async (event) => {
   try {
+    console.log("Lambda Function handler called");
+    // fetch the last JWT token from the DynamoDB table
+    const { Items } = await dynamo.send(
+      new ScanCommand({
+        TableName: tableName,
+      })
+    );
+
+    // check if there is a JWT token in the DynamoDB table
+    if (Items.length >= 1) {
+      const lastRecord = Items[Items.length - 1];
+      cachedJwt = lastRecord.jwt;
+      cachedJwtExpiresAt = lastRecord.expires_at;
+      dataCloudInstanceUrl = lastRecord.dataCloudInstanceUrl;
+    }
+
+    // get the secret from AWS Secrets Manager
+    const secretResponse = await client.send(
+      new GetSecretValueCommand({
+        SecretId: secret_name,
+        VersionStage: "AWSCURRENT",
+      })
+    );
+
+    // parse the secret string on a global variable
+    secret = JSON.parse(secretResponse.SecretString);
+
     // check if the token is still valid
     if (
       !cachedJwtExpiresAt ||
@@ -156,21 +150,17 @@ export const handler = async (event) => {
       // save jwt token to dynamodb
       const tokenExpiration =
         dataCloudResponseData.expires_in + Math.round(Date.now() / 1000);
-      try {
-        await dynamo.send(
-          new PutCommand({
-            TableName: tableName,
-            Item: {
-              jwt: dataCloudResponseData.access_token,
-              expires_at: tokenExpiration,
-              dataCloudInstanceUrl,
-            },
-          })
-        );
-      } catch (error) {
-        console.error(error);
-        throw error;
-      }
+
+      await dynamo.send(
+        new PutCommand({
+          TableName: tableName,
+          Item: {
+            jwt: dataCloudResponseData.access_token,
+            expires_at: tokenExpiration,
+            dataCloudInstanceUrl,
+          },
+        })
+      );
     }
 
     // Data Cloud Ingestion API URL

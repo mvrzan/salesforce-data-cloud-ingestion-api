@@ -17,17 +17,6 @@ const keyVaultName = process.env.KEY_VAULT_NAME;
 const keyVaultUrl = `https://${keyVaultName}.vault.azure.net`;
 const secretClient = new SecretClient(keyVaultUrl, credential);
 
-console.log("Azure Key Vault successfully initialized.");
-
-// Retrieve secrets from Azure Key Vault
-const { value: clientId } = await secretClient.getSecret("CLIENT-ID");
-const { value: username } = await secretClient.getSecret("USERNAME");
-const { value: privateKey } = await secretClient.getSecret("RSA-PRIVATE-KEY");
-const { value: loginUrl } = await secretClient.getSecret("LOGIN-URL");
-const { value: ingestionSourceApiName } = await secretClient.getSecret(
-  "INGESTION-SOURCE-API-NAME"
-);
-
 // Initialize Cosmos DB client
 const cosmosEndpoint = process.env.COSMOS_DB_ENDPOINT;
 const cosmosKey = process.env.COSMOS_DB_KEY;
@@ -38,32 +27,38 @@ const cosmosClient = new CosmosClient({
 const databaseId = process.env.COSMOS_DB_DATABASE_ID;
 const containerId = process.env.COSMOS_DB_CONTAINER_ID;
 
-// fetch the last JWT token from the Cosmos DB container
-try {
-  const { database } = await cosmosClient.databases.createIfNotExists({
-    id: databaseId,
-  });
-  const { container } = await database.containers.createIfNotExists({
-    id: containerId,
-  });
-
-  const { resources: items } = await container.items
-    .query({ query: "SELECT * FROM c" })
-    .fetchAll();
-
-  if (items.length >= 1) {
-    const lastRecord = items[items.length - 1];
-    cachedJwt = lastRecord.jwt;
-    cachedJwtExpiresAt = lastRecord.expires_at;
-    dataCloudInstanceUrl = lastRecord.dataCloudInstanceUrl;
-  }
-} catch (error) {
-  console.error(error);
-}
-
 export const handler = async (context, req) => {
   try {
     context.log("Azure Function handler called");
+
+    // Retrieve secrets from Azure Key Vault
+    const { value: clientId } = await secretClient.getSecret("CLIENT-ID");
+    const { value: username } = await secretClient.getSecret("USERNAME");
+    const { value: privateKey } = await secretClient.getSecret(
+      "RSA-PRIVATE-KEY"
+    );
+    const { value: loginUrl } = await secretClient.getSecret("LOGIN-URL");
+    const { value: ingestionSourceApiName } = await secretClient.getSecret(
+      "INGESTION-SOURCE-API-NAME"
+    );
+
+    // fetch the last JWT token from the Cosmos DB container
+    const { database } = await cosmosClient.databases.createIfNotExists({
+      id: databaseId,
+    });
+    const { container } = await database.containers.createIfNotExists({
+      id: containerId,
+    });
+    const { resources: items } = await container.items
+      .query({ query: "SELECT * FROM c" })
+      .fetchAll();
+
+    if (items.length >= 1) {
+      const lastRecord = items[items.length - 1];
+      cachedJwt = lastRecord.jwt;
+      cachedJwtExpiresAt = lastRecord.expires_at;
+      dataCloudInstanceUrl = lastRecord.dataCloudInstanceUrl;
+    }
 
     // check if the token is still valid
     if (

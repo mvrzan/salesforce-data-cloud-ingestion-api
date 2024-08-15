@@ -181,7 +181,7 @@ export const handler = async (event) => {
         method: "POST",
         headers: {
           Authorization: `Bearer ${
-            cachedJwt ? cachedJwt : fetchedDataCloudToken
+            fetchedDataCloudToken ? fetchedDataCloudToken : cachedJwt
           }`,
           "Content-Type": "application/json",
         },

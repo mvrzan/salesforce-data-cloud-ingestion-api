@@ -11,6 +11,13 @@ let dataCloudInstanceUrl; // Data Cloud instance URL
 let fetchedDataCloudInstanceUrl; // Data Cloud instance URL fetched from the token exchange
 let fetchedDataCloudToken; // Data Cloud token fetched from the token exchange
 
+// create global variables to store Azure Key Vault secrets
+let clientId;
+let username;
+let privateKey;
+let loginUrl;
+let ingestionSourceApiName;
+
 // Initialize Azure Key Vault client
 const credential = new DefaultAzureCredential();
 const keyVaultName = process.env.KEY_VAULT_NAME;
@@ -32,15 +39,21 @@ export const handler = async (context, req) => {
     context.log("Azure Function handler called");
 
     // Retrieve secrets from Azure Key Vault
-    const { value: clientId } = await secretClient.getSecret("CLIENT-ID");
-    const { value: username } = await secretClient.getSecret("USERNAME");
-    const { value: privateKey } = await secretClient.getSecret(
+    const { value: clientIdSecret } = await secretClient.getSecret("CLIENT-ID");
+    const { value: usernameSecret } = await secretClient.getSecret("USERNAME");
+    const { value: privateKeySecret } = await secretClient.getSecret(
       "RSA-PRIVATE-KEY"
     );
-    const { value: loginUrl } = await secretClient.getSecret("LOGIN-URL");
-    const { value: ingestionSourceApiName } = await secretClient.getSecret(
-      "INGESTION-SOURCE-API-NAME"
-    );
+    const { value: loginUrlSecret } = await secretClient.getSecret("LOGIN-URL");
+    const { value: ingestionSourceApiNameSecret } =
+      await secretClient.getSecret("INGESTION-SOURCE-API-NAME");
+
+    // set global variables with the fetched secrets
+    clientId = clientIdSecret;
+    username = usernameSecret;
+    privateKey = privateKeySecret;
+    loginUrl = loginUrlSecret;
+    ingestionSourceApiName = ingestionSourceApiNameSecret;
 
     // fetch the last JWT token from the Cosmos DB container
     const { database } = await cosmosClient.databases.createIfNotExists({

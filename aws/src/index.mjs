@@ -6,7 +6,7 @@ export const handler = async (event) => {
   try {
     console.log("Lambda Function handler called");
     const { token, dataCloudInstanceUrl, ingestionSourceApiName } =
-      await getSfToken(event);
+      await getSfToken();
 
     // Data Cloud Ingestion API URL
     const dataCloudIngestionApiUrl = `https://${dataCloudInstanceUrl}/api/v1/ingest/sources/${ingestionSourceApiName}/${event.queryStringParameters.objectName}`;

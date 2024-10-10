@@ -137,6 +137,7 @@ Once the CloudShell terminal opens, on the right-hand side, you will see a butto
 Run the following commands in the CloudShell:
 
 ```
+unzip <name-of-your-zip-file>
 sam build
 ```
 
